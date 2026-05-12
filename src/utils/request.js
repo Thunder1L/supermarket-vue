@@ -3,8 +3,8 @@ import { ElMessage } from 'element-plus'
 import router from '@/router' // 引入路由以便跳转
 
 const service = axios.create({
-  baseURL: '', 
-  timeout: 5000
+  baseURL: 'https://supermarket-server-production-cd4d.up.railway.app/api', 
+  timeout: 10000
 })
 
 // 请求拦截器
