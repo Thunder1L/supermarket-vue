@@ -3,7 +3,7 @@ import { ElMessage } from 'element-plus'
 import router from '@/router' // 引入路由以便跳转
 
 const service = axios.create({
-  baseURL: 'https://supermarket-server-production-cd4d.up.railway.app/api', 
+  baseURL: 'https://supermarket-server-production-cd4d.up.railway.app', 
   timeout: 10000
 })
 
