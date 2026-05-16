@@ -1,47 +1,66 @@
 <template>
-  <div class="pda-layout">
-    <header class="pda-header">
-      <div class="left-action">
-        <el-icon v-if="$route.path !== '/employee/dashboard'" @click="$router.back()">
-          <ArrowLeft />
-        </el-icon>
+  <el-container class="employee-layout">
+    <el-header class="header">
+      <div class="logo" @click="$router.push('/employee/dashboard')">
+        🏪 超市门店工作台
       </div>
-      <div class="pda-title">{{ $route.meta.title || '门店履约端' }}</div>
-      <div class="right-action" @click="handleLogout">
-        <el-icon><SwitchButton /></el-icon>
+      <div class="right-menu">
+        <span class="welcome-text">Hi, {{ username }}</span>
+        <el-button type="danger" plain size="small" @click="handleLogout">
+          退出交接
+        </el-button>
       </div>
-    </header>
+    </el-header>
 
-    <main class="pda-content">
-      <router-view />
-    </main>
-  </div>
+    <el-main class="main-content">
+      <router-view v-slot="{ Component }">
+        <transition name="fade-transform" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
+    </el-main>
+  </el-container>
 </template>
 
 <script setup>
-import { ArrowLeft, SwitchButton } from '@element-plus/icons-vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessageBox } from 'element-plus'
+import { ElMessageBox, ElMessage } from 'element-plus'
 
 const router = useRouter()
+const username = ref(localStorage.getItem('username') || '门店员工')
 
 const handleLogout = () => {
-  ElMessageBox.confirm('确定退出当前员工账号吗？', '提示', { type: 'warning' }).then(() => {
+  ElMessageBox.confirm('确定要退出当前工作台吗？', '下班交接', {
+    confirmButtonText: '确定退出',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(() => {
     localStorage.clear()
-    router.push('/choice')
+    ElMessage.success('已安全退出')
+    router.push('/admin/login?type=employee') // 退回到员工专属登录页
   })
 }
 </script>
 
 <style scoped>
-.pda-layout { height: 100vh; display: flex; flex-direction: column; background: #f0f2f5; }
-.pda-header { 
-  height: 50px; background: #409eff; color: white; 
-  display: flex; align-items: center; justify-content: space-between; 
-  padding: 0 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  flex-shrink: 0;
+.employee-layout { height: 100vh; background-color: #f0f2f5; }
+.header { 
+  background: linear-gradient(90deg, #36D1DC, #5B86E5); 
+  color: white; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  padding: 0 30px;
 }
-.pda-title { font-weight: bold; font-size: 18px; }
-.pda-content { flex: 1; overflow-y: auto; padding: 10px; }
-.left-action, .right-action { font-size: 20px; cursor: pointer; width: 30px; }
+.logo { font-size: 20px; font-weight: bold; cursor: pointer; }
+.right-menu { display: flex; align-items: center; gap: 15px; }
+.welcome-text { font-size: 14px; opacity: 0.9; }
+.main-content { padding: 20px; box-sizing: border-box; }
+
+/* 路由动画 */
+.fade-transform-leave-active, .fade-transform-enter-active { transition: all 0.3s; }
+.fade-transform-enter-from { opacity: 0; transform: translateX(-30px); }
+.fade-transform-leave-to { opacity: 0; transform: translateX(30px); }
 </style>

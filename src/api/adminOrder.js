@@ -3,7 +3,7 @@ import request from '@/utils/request'
 // 获取订单列表
 export function getOrderList(params) {
   return request({
-    url: '/admin/order/list',
+    url: '/api/admin/order/list',
     method: 'get',
     params // { page, size, status, orderNo }
   })
@@ -12,7 +12,7 @@ export function getOrderList(params) {
 // 发货
 export function shipOrder(id) {
   return request({
-    url: `/admin/order/ship/${id}`,
+    url: `/api/admin/order/ship/${id}`,
     method: 'post'
   })
 }
@@ -20,7 +20,7 @@ export function shipOrder(id) {
 // 删除
 export function deleteOrder(id) {
   return request({
-    url: `/admin/order/delete/${id}`,
+    url: `/api/admin/order/delete/${id}`,
     method: 'delete'
   })
 }

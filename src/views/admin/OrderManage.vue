@@ -39,7 +39,10 @@
                 <el-table-column prop="totalPrice" label="小计" width="100" />
               </el-table>
               <div class="receiver-info" style="margin-top: 10px; color: #666; font-size: 13px;">
-                收货信息（模拟）：张三，13800138000，北京市朝阳区...
+                收货信息：
+                {{ props.row.receiverName || '未录入姓名' }} ，
+                {{ props.row.receiverPhone || '未录入手机号' }} ，
+                {{ props.row.receiverAddress || '未录入地址' }}
               </div>
             </div>
           </template>
@@ -65,7 +68,6 @@
 
         <el-table-column label="操作" width="150" align="center" fixed="right">
           <template #default="scope">
-            <!-- 只有待发货(1)状态才显示发货按钮 -->
             <el-button 
               v-if="scope.row.status === 1" 
               type="success" 
@@ -74,8 +76,9 @@
             >
               发货
             </el-button>
+            
             <el-button 
-              v-else 
+              v-if="scope.row.status === 3 || scope.row.status === 4" 
               type="danger" 
               link 
               size="small" 
@@ -124,18 +127,51 @@ onMounted(() => {
   loadData()
 })
 
+// const loadData = async () => {
+//   loading.value = true
+//   try {
+//     const res = await getOrderList(queryParams)
+//     if (res.code === 0) {
+//       // 格式化一下时间
+//       res.data.records.forEach(item => {
+//         item.createTime = dayjs(item.createTime).format('YYYY-MM-DD HH:mm:ss')
+//       })
+//       tableData.value = res.data.records
+//       total.value = res.data.total
+//     }
+//   } finally {
+//     loading.value = false
+//   }
+// }
+
 const loadData = async () => {
   loading.value = true
   try {
     const res = await getOrderList(queryParams)
-    if (res.code === 0) {
+    
+    // 【修复1】兼容判断：200 或者 0 都认为是成功
+    if (res.code === 200 || res.code === 0) {
       // 格式化一下时间
-      res.data.records.forEach(item => {
-        item.createTime = dayjs(item.createTime).format('YYYY-MM-DD HH:mm:ss')
-      })
-      tableData.value = res.data.records
-      total.value = res.data.total
+      if (res.data && res.data.records) {
+        res.data.records.forEach(item => {
+          // 如果后端返回的时间格式本就是正确的，这步其实可以省略
+          if(item.createTime) {
+              item.createTime = dayjs(item.createTime).format('YYYY-MM-DD HH:mm:ss')
+          }
+        })
+        tableData.value = res.data.records
+        total.value = res.data.total
+      } else {
+        tableData.value = []
+        total.value = 0
+      }
+    } else {
+      // 【修复2】增加静默失败的兜底提示，以后再出 Bug 一眼就能看出来！
+      ElMessage.error(res.msg || '获取数据失败，状态码错误：' + res.code)
     }
+  } catch (error) {
+    console.error('获取订单列表出错:', error)
+    ElMessage.error('网络或接口请求异常，请按 F12 查看控制台')
   } finally {
     loading.value = false
   }
@@ -152,7 +188,7 @@ const handleShip = (row) => {
     type: 'warning'
   }).then(async () => {
     const res = await shipOrder(row.id)
-    if (res.code === 0) {
+    if (res.code === 200 || res.code === 0) {
       ElMessage.success('发货成功')
       loadData()
     } else {
@@ -166,7 +202,7 @@ const handleDelete = (row) => {
   ElMessageBox.confirm('确定删除该订单记录吗?', '警告', { type: 'warning' })
     .then(async () => {
       const res = await deleteOrder(row.id)
-      if (res.code === 0) {
+      if (res.code === 200 || res.code === 0) {
         ElMessage.success('删除成功')
         loadData()
       }

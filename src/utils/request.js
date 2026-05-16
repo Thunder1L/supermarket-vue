@@ -3,7 +3,9 @@ import { ElMessage } from 'element-plus'
 import router from '@/router' // 引入路由以便跳转
 
 const service = axios.create({
-  baseURL: 'https://supermarket-server-production-cd4d.up.railway.app', 
+  // baseURL: 'https://supermarket-server-production-cd4d.up.railway.app', 
+  baseURL: '', 
+
   timeout: 10000
 })
 
@@ -22,15 +24,19 @@ service.interceptors.request.use(config => {
 service.interceptors.response.use(
   response => {
     const res = response.data
-    // 如果后端返回的 code 不是 0，说明业务逻辑出错
-    if (res.code !== 0) {
-      // 【修改】优先显示后端返回的 msg，如果没有才显示 '系统未知错误'
+    
+    console.log('【Debug】后端真实返回的数据：', res)
+
+    // 【终极修复】兼容后端可能返回的 code: 200 和 code: 0 两种成功状态！
+    if (res.code !== 0 && res.code !== 200) {
+      // 只有既不是 0 也不是 200 的时候，才是真正的业务错误
       const errorMsg = res.msg || '系统未知错误'
       ElMessage.error(errorMsg)
       // 可以选择抛出错误，中断后续逻辑
       return Promise.reject(new Error(errorMsg))
     }
-    return res // 也就是 res.data
+    
+    return res // 直接放行正常数据
   },
   error => {
     console.log('err' + error) // for debug

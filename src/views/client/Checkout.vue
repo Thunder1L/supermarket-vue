@@ -7,12 +7,19 @@
 
       <el-row :gutter="20">
         <el-col :span="16">
-          <!-- 1. 收货地址 -->
-          <el-card shadow="never" class="section-card">
+          
+          <el-card shadow="never" class="section-card delivery-section">
+            <template #header><span class="card-title">📦 配送方式</span></template>
+            <el-radio-group v-model="deliveryType" size="large">
+              <el-radio :label="1" border>🏪 门店自提 (免运费)</el-radio>
+              <el-radio :label="2" border>🛵 外送上门 (专人配送)</el-radio>
+            </el-radio-group>
+          </el-card>
+
+          <el-card v-if="deliveryType === 2" shadow="never" class="section-card">
             <template #header>
               <div class="card-header-row">
                 <span class="card-title">收货地址</span>
-                <!-- 这里点击直接弹出 Dialog，而不是跳转 -->
                 <el-button link type="primary" @click="openAddrDialog">+ 新增地址</el-button>
               </div>
             </template>
@@ -35,14 +42,11 @@
                   <el-tag v-if="addr.isDefault" size="small" type="danger" effect="dark" class="tag">默认</el-tag>
                 </div>
                 <div class="detail">{{ addr.region }} {{ addr.detailAddress }}</div>
-                
-                <!-- 选中图标 -->
                 <el-icon v-if="selectedAddressId === addr.id" class="check-icon"><Select /></el-icon>
               </div>
             </div>
           </el-card>
 
-          <!-- 2. 商品清单 -->
           <el-card shadow="never" class="section-card">
             <template #header><span class="card-title">商品清单</span></template>
             <el-table :data="cartItems" :show-header="false">
@@ -66,7 +70,6 @@
         </el-col>
 
         <el-col :span="8">
-          <!-- 3. 结算面板 -->
           <el-card shadow="always" class="checkout-panel">
             <div class="summary-row">
               <span>商品总价</span>
@@ -75,10 +78,9 @@
             
             <div class="summary-row">
               <span>运费</span>
-              <span>¥ 0.00</span>
+              <span>{{ deliveryType === 2 ? '¥ 5.00 (或免邮)' : '¥ 0.00' }}</span> 
             </div>
 
-            <!-- 优惠券选择 -->
             <div class="summary-row">
               <span>优惠券</span>
               <el-select v-model="selectedCouponId" placeholder="不使用" clearable size="small" style="width: 140px">
@@ -98,19 +100,19 @@
               <span class="price">¥ {{ finalPrice }}</span>
             </div>
 
-            <!-- 支付方式 -->
             <div class="pay-methods">
               <div 
-                class="pay-item" :class="{ active: payType === 1 }" 
-                @click="payType = 1"
+                class="pay-item" :class="{ active: payMethod === 1 }" 
+                @click="payMethod = 1"
               >
-                <el-icon color="#09bb07"><ChatDotRound /></el-icon> 微信
+                <el-icon color="#09bb07"><ChatDotRound /></el-icon> 微信/支付宝
               </div>
               <div 
-                class="pay-item" :class="{ active: payType === 2 }" 
-                @click="payType = 2"
+                class="pay-item" :class="{ active: payMethod === 2 }" 
+                @click="payMethod = 2"
               >
-                <el-icon color="#1677ff"><Wallet /></el-icon> 支付宝
+                <el-icon color="#f56c6c"><Wallet /></el-icon> 余额支付
+                <span class="balance-text">(¥{{ userBalance }})</span>
               </div>
             </div>
 
@@ -122,7 +124,6 @@
       </el-row>
     </div>
 
-    <!-- 4. 新增地址弹窗 -->
     <el-dialog v-model="addrDialogVisible" title="新增收货地址" width="450px">
       <el-form :model="addrForm" label-width="80px">
         <el-form-item label="收货人">
@@ -147,6 +148,22 @@
       </template>
     </el-dialog>
 
+    <el-dialog v-model="payDialogVisible" title="微信 / 支付宝扫码支付" width="350px" center :close-on-click-modal="false" :show-close="false">
+      <div style="text-align: center;">
+        <h3 style="color: #f56c6c; margin-bottom: 20px;">需支付: ¥ {{ finalPrice }}</h3>
+        <el-image 
+          style="width: 200px; height: 200px; border: 1px solid #eee; border-radius: 8px;" 
+          src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=MockPayment" 
+        />
+        <p style="color: #666; font-size: 14px; margin-top: 15px;">请使用手机扫码完成支付</p>
+      </div>
+      <template #footer>
+        <span class="dialog-footer" style="display: flex; justify-content: space-between;">
+          <el-button @click="handleCancelPay">稍后支付</el-button>
+          <el-button type="success" :loading="paying" @click="handleConfirmPay">我已完成支付</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -155,10 +172,12 @@ import { ref, computed, onMounted, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Select, ChatDotRound, Wallet } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-// API 引入
 import { getAddressList, addAddress } from '@/api/address'
 import { getMyCoupons } from '@/api/coupon'
-import { getCartList, checkout } from '@/api/cart' // 注意：提交订单用 checkout
+import { getCartList, checkout } from '@/api/cart'
+import { getUserInfo } from '@/api/user' 
+// 🚨 引入模拟支付接口，请确保 src/api/order.js 里有这个方法
+import { mockPay } from '@/api/order' 
 
 const router = useRouter()
 const route = useRoute()
@@ -168,17 +187,23 @@ const selectedAddressId = ref(null)
 const cartItems = ref([])
 const couponList = ref([])
 const selectedCouponId = ref(null)
-const payType = ref(1) 
-const submitting = ref(false)
 const remark = ref('')
 
-// 地址弹窗相关
+const deliveryType = ref(2) 
+const payMethod = ref(1)    
+const userBalance = ref('0.00') 
+const submitting = ref(false)
+
 const addrDialogVisible = ref(false)
 const addrForm = reactive({
   receiverName: '', phone: '', region: '', detailAddress: '', isDefault: 0
 })
 
-// 解析 URL 参数 cartIds=1,2,3
+// 🚨 模拟收银台专属状态
+const payDialogVisible = ref(false)
+const paying = ref(false)
+const createdOrderId = ref(null)
+
 const cartIdsStr = route.query.cartIds
 const targetCartIds = cartIdsStr ? cartIdsStr.split(',').map(Number) : []
 
@@ -188,15 +213,25 @@ onMounted(async () => {
     router.push('/cart')
     return
   }
-  await Promise.all([loadAddress(), loadCart(), loadCoupons()])
+  await Promise.all([loadAddress(), loadCart(), loadCoupons(), loadUserBalance()])
 })
 
 // --- 加载数据 ---
+const loadUserBalance = async () => {
+  try {
+    const res = await getUserInfo()
+    if (res.code === 0 || res.code === 200) {
+      userBalance.value = res.data.balance || '0.00'
+    }
+  } catch (e) {
+    console.warn('获取用户余额失败，请确保后端的 getUserInfo 接口正常工作')
+  }
+}
+
 const loadAddress = async () => {
   const res = await getAddressList()
-  if (res.code === 0) {
+  if (res.code === 0 || res.code === 200) {
     addressList.value = res.data
-    // 默认选中
     if (!selectedAddressId.value && addressList.value.length > 0) {
       const def = addressList.value.find(a => a.isDefault)
       selectedAddressId.value = def ? def.id : addressList.value[0].id
@@ -206,15 +241,14 @@ const loadAddress = async () => {
 
 const loadCart = async () => {
   const res = await getCartList()
-  if (res.code === 0) {
-    // 过滤出用户勾选的商品
+  if (res.code === 0 || res.code === 200) {
     cartItems.value = res.data.filter(item => targetCartIds.includes(item.id))
   }
 }
 
 const loadCoupons = async () => {
   const res = await getMyCoupons()
-  if (res.code === 0) couponList.value = res.data
+  if (res.code === 0 || res.code === 200) couponList.value = res.data
 }
 
 // --- 计算逻辑 ---
@@ -244,11 +278,10 @@ const openAddrDialog = () => {
 const saveAddress = async () => {
   if(!addrForm.receiverName || !addrForm.phone) return ElMessage.warning('请填写完整信息')
   const res = await addAddress(addrForm)
-  if(res.code === 0) {
+  if(res.code === 0 || res.code === 200) {
     ElMessage.success('地址添加成功')
     addrDialogVisible.value = false
-    await loadAddress() // 刷新列表
-    // 如果是第一个地址，自动选中
+    await loadAddress() 
     if(addressList.value.length === 1) {
       selectedAddressId.value = addressList.value[0].id
     }
@@ -257,45 +290,87 @@ const saveAddress = async () => {
   }
 }
 
-// --- 提交订单 ---
+// --- 🚨 核心提交订单逻辑 ---
 const handlePay = async () => {
-  if (!selectedAddressId.value) return ElMessage.warning('请选择收货地址')
+  if (deliveryType.value === 2 && !selectedAddressId.value) {
+    return ElMessage.warning('请选择外送收货地址')
+  }
+
+  if (payMethod.value === 2 && parseFloat(finalPrice.value) > parseFloat(userBalance.value)) {
+    return ElMessage.error(`您的余额不足 (仅剩 ¥${userBalance.value})，请充值或更换支付方式`)
+  }
   
   submitting.value = true
   try {
     const payload = {
       cartIds: targetCartIds,
-      addressId: selectedAddressId.value,
-      remark: remark.value
-      // 如果后端支持优惠券和支付方式，这里可以加上:
-      // couponId: selectedCouponId.value,
-      // payType: payType.value
+      addressId: deliveryType.value === 2 ? selectedAddressId.value : null,
+      remark: remark.value,
+      couponId: selectedCouponId.value,
+      deliveryType: deliveryType.value,
+      payMethod: payMethod.value
     }
     
-    // 调用后端的 checkout 接口
     const res = await checkout(payload)
-    if (res.code === 0) {
-      ElMessage.success('下单成功！')
-      router.push('/orders')
+    if (res.code === 0 || res.code === 200) {
+      // 获取后端刚生成的订单ID
+      createdOrderId.value = res.data.orderId || res.data 
+      
+      if (payMethod.value === 1) {
+        // 如果是微信/支付宝，呼出收银台弹窗！
+        payDialogVisible.value = true
+      } else {
+        // 如果是余额支付，直接扣款成功跳走
+        ElMessage.success('余额支付成功！订单已生成')
+        router.push('/orders') 
+      }
     } else {
-      ElMessage.error(res.msg)
+      ElMessage.error(res.msg || '结算失败')
     }
   } finally {
     submitting.value = false
   }
 }
+
+// --- 🚨 模拟收银台交互事件 ---
+const handleConfirmPay = async () => {
+  if (!createdOrderId.value) return ElMessage.error('订单异常，缺失ID')
+  paying.value = true
+  try {
+    // 调后端的 mockPay 接口把状态从 0 改为 1
+    const res = await mockPay({ orderId: createdOrderId.value })
+    if (res.code === 0 || res.code === 200) {
+      ElMessage.success('扫码支付成功！')
+      payDialogVisible.value = false
+      router.push('/orders')
+    } else {
+      ElMessage.error(res.msg || '支付状态确认失败')
+    }
+  } catch (error) {
+    console.error(error)
+  } finally {
+    paying.value = false
+  }
+}
+
+const handleCancelPay = () => {
+  payDialogVisible.value = false
+  ElMessage.warning('已取消支付，订单已生成，请尽快付款')
+  router.push('/orders')
+}
 </script>
 
 <style scoped>
+/* 保持原本的优秀样式 */
 .checkout-page { padding: 20px 0; background: #f5f7fa; min-height: 100vh; }
 .container { max-width: 1100px; margin: 0 auto; padding: 0 10px; }
 .header h2 { margin-bottom: 20px; color: #333; }
 
 .section-card { margin-bottom: 20px; }
+.delivery-section { border-left: 4px solid #409eff; }
 .card-header-row { display: flex; justify-content: space-between; align-items: center; }
 .card-title { font-weight: bold; }
 
-/* 地址网格 */
 .address-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
 .addr-item { 
   border: 1px solid #dcdfe6; border-radius: 4px; padding: 15px; cursor: pointer; position: relative;
@@ -310,20 +385,19 @@ const handlePay = async () => {
 .detail { color: #666; font-size: 13px; line-height: 1.4; }
 .empty-addr { text-align: center; color: #999; padding: 20px; }
 
-/* 结算面板 */
 .checkout-panel { position: sticky; top: 80px; }
 .summary-row { display: flex; justify-content: space-between; margin-bottom: 12px; color: #666; font-size: 14px; align-items: center; }
 .final-row { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10px; }
 .final-row .label { font-weight: bold; font-size: 16px; }
 .final-row .price { color: #f56c6c; font-size: 28px; font-weight: bold; }
 
-/* 支付方式 */
 .pay-methods { display: flex; gap: 10px; margin: 20px 0; }
 .pay-item { 
   flex: 1; border: 1px solid #dcdfe6; border-radius: 4px; padding: 10px; 
-  display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; transition: 0.2s;
 }
-.pay-item.active { border-color: #409eff; color: #409eff; background: #ecf5ff; }
+.pay-item.active { border-color: #f56c6c; color: #f56c6c; background: #fffcfc; font-weight: bold; }
+.balance-text { font-size: 12px; color: #999; font-weight: normal; margin-left: 5px; }
 
 .pay-btn { width: 100%; font-weight: bold; }
 .remark-box { margin-top: 20px; }

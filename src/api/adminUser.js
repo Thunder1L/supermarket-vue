@@ -26,11 +26,11 @@ export function register(data) {
 
 // 管理员发送验证码
 // 【注意】UI中现在使用的是手机号发送，所以这里参数名为 phone
-export function sendCode(phone) {
+export function sendCode(data) {
   return request({
     url: '/api/admin/sendCode',
-    method: 'get',
-    params: { phone } 
+    method: 'post',
+    params: data
   })
 }
 

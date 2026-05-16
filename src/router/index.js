@@ -47,6 +47,10 @@ const routes = [
   { path: "/checkout", component: Checkout, meta: { layout: 'client', requiresAuth: true } },
   { path: "/payment", component: Payment, meta: { layout: 'client', requiresAuth: true } },
 
+// 【关键】注册管理员个人中心路由
+{ path: "/admin/profile", component: AdminProfile, meta: { layout: 'admin', requiresAuth: true } },
+
+
   /* ================= 管理员布局 (Sidebar) ================= */
   { path: "/admin/dashboard", component: Dashboard, meta: { layout: 'admin', requiresAuth: true } },
   { path: "/admin/product", component: ProductManage, meta: { layout: 'admin', requiresAuth: true } },
@@ -71,12 +75,24 @@ path: 'scan-verify',
  name: 'ScanVerify',
  component: () => import('@/views/employee/ScanVerify.vue'),
  meta: { title: '分拣核销' }
- }
+ },
+ {
+  path: 'inventory',
+  name: 'InventoryManage',
+  component: () => import('@/views/employee/InventoryManage.vue'),
+  meta: { title: '货架盘点' }
+},
+{
+  path: 'delivery',
+  name: 'DeliveryManage',
+  component: () => import('@/views/employee/DeliveryManage.vue'),
+  meta: { title: '外送配送' }
+},
+ 
  ]
  },
 
-// 【关键】注册管理员个人中心路由
-{ path: "/admin/profile", component: AdminProfile, meta: { layout: 'admin', requiresAuth: true } }
+
 ];
 
 const router = createRouter({

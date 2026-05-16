@@ -41,3 +41,12 @@ export function applyAfterSales(data) {
     data // { orderId, reason }
   })
 }
+
+// src/api/order.js
+export function mockPay(data) {
+  return request({
+    url: '/api/order/mockPay', // 🚨 强行统一暗号：必须是 /mockPay
+    method: 'post',
+    data: data // 把包含 orderId 的对象放进请求体里传给后端
+  })
+}
